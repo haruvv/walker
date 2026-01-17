@@ -1,23 +1,52 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../services/goal_service.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
-  // モックデータ
-  static const int todaySteps = 4321;
-  static const int goalSteps = 8000;
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
 
-  // 計算用のモックデータ
+class _HomeScreenState extends State<HomeScreen> {
+  // モックデータ（今日の歩数は仮データのまま）
+  static const int todaySteps = 4321;
+
+  // 目標歩数（保存された値を読み込む）
+  int _goalSteps = GoalService.defaultGoal;
+
+  // 計算用
   double get _distance => todaySteps * 0.0008;
   double get _calories => todaySteps * 0.04;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGoalSteps();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadGoalSteps();
+  }
+
+  Future<void> _loadGoalSteps() async {
+    final goal = await GoalService.getGoalSteps();
+    if (mounted) {
+      setState(() {
+        _goalSteps = goal;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final remainingSteps = goalSteps - todaySteps;
-    final progress = todaySteps / goalSteps;
+    final remainingSteps = _goalSteps - todaySteps;
+    final progress = todaySteps / _goalSteps;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -244,7 +273,7 @@ class HomeScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '${_formatNumber(goalSteps)} 歩',
+                            '${_formatNumber(_goalSteps)} 歩',
                             style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.w600,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/goal_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -8,7 +9,40 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final TextEditingController _goalController = TextEditingController(text: '8000');
+  final TextEditingController _goalController = TextEditingController();
+  bool _isSaved = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGoalSteps();
+  }
+
+  Future<void> _loadGoalSteps() async {
+    final goal = await GoalService.getGoalSteps();
+    setState(() {
+      _goalController.text = goal.toString();
+    });
+  }
+
+  Future<void> _saveGoalSteps() async {
+    final text = _goalController.text.trim();
+    final steps = int.tryParse(text);
+    if (steps != null && steps > 0) {
+      await GoalService.setGoalSteps(steps);
+      setState(() {
+        _isSaved = true;
+      });
+      // 2秒後に「保存済み」表示を消す
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) {
+          setState(() {
+            _isSaved = false;
+          });
+        }
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -126,6 +160,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             controller: _goalController,
                             keyboardType: TextInputType.number,
                             textAlign: TextAlign.center,
+                            onChanged: (_) {
+                              // 入力が変わったら保存済み表示をリセット
+                              if (_isSaved) {
+                                setState(() {
+                                  _isSaved = false;
+                                });
+                              }
+                            },
                             style: const TextStyle(
                               fontSize: 32,
                               fontWeight: FontWeight.w600,
@@ -164,6 +206,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 24,
                                 vertical: 20,
+                              ),
+                            ),
+                          ),
+                        ),
+                        // 保存ボタン
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _saveGoalSteps,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: colorScheme.primary,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: Text(
+                                _isSaved ? '保存しました' : '保存',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ),
@@ -236,16 +304,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text(
-                      '※ 保存機能は未実装です',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[400],
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -258,6 +316,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _setGoal(String value) {
     setState(() {
       _goalController.text = value;
+      _isSaved = false;
     });
   }
 }
