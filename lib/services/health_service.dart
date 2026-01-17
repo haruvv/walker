@@ -43,6 +43,7 @@ class HealthService {
   }
 
   /// 今日の歩数を取得
+  /// データがない場合は0を返し、エラー時のみnullを返す
   static Future<int?> getTodaySteps() async {
     try {
       final now = DateTime.now();
@@ -50,9 +51,9 @@ class HealthService {
       
       // 歩数データを取得
       final steps = await _health.getTotalStepsInInterval(midnight, now);
-      return steps;
+      return steps ?? 0; // データなしは0歩として扱う
     } catch (e) {
-      return null;
+      return null; // 例外時のみエラー
     }
   }
 

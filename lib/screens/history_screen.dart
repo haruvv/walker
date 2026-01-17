@@ -26,29 +26,37 @@ class _HistoryScreenState extends State<HistoryScreen> {
       _healthStatus = HealthStatus.loading;
     });
 
-    // 権限チェック
-    final hasAuth = await HealthService.hasAuthorization();
-    if (!hasAuth) {
-      final granted = await HealthService.requestAuthorization();
-      if (!granted) {
-        if (mounted) {
-          setState(() {
-            _healthStatus = HealthStatus.notAuthorized;
-          });
+    try {
+      // 権限チェック
+      final hasAuth = await HealthService.hasAuthorization();
+      if (!hasAuth) {
+        final granted = await HealthService.requestAuthorization();
+        if (!granted) {
+          if (mounted) {
+            setState(() {
+              _healthStatus = HealthStatus.notAuthorized;
+            });
+          }
+          return;
         }
-        return;
       }
-    }
 
-    final goal = await GoalService.getGoalSteps();
-    final steps = await HealthService.getWeeklySteps();
+      final goal = await GoalService.getGoalSteps();
+      final steps = await HealthService.getWeeklySteps();
 
-    if (mounted) {
-      setState(() {
-        _goalSteps = goal;
-        _weeklySteps = steps;
-        _healthStatus = HealthStatus.authorized;
-      });
+      if (mounted) {
+        setState(() {
+          _goalSteps = goal;
+          _weeklySteps = steps;
+          _healthStatus = HealthStatus.authorized;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _healthStatus = HealthStatus.error;
+        });
+      }
     }
   }
 
@@ -81,9 +89,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ? _buildLoading()
             : _healthStatus == HealthStatus.notAuthorized
                 ? _buildPermissionRequest(theme, colorScheme)
-                : _weeklySteps.isEmpty
-                    ? _buildEmpty(theme)
-                    : _buildContent(theme, colorScheme),
+                : _healthStatus == HealthStatus.error
+                    ? _buildError(theme, colorScheme)
+                    : _weeklySteps.isEmpty
+                        ? _buildEmpty(theme, colorScheme)
+                        : _buildContent(theme, colorScheme),
       ),
     );
   }
@@ -93,13 +103,86 @@ class _HistoryScreenState extends State<HistoryScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 16),
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              color: Colors.grey[400],
+            ),
+          ),
+          const SizedBox(height: 20),
           Text(
             '履歴を取得中...',
             style: TextStyle(
+              fontSize: 15,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildError(ThemeData theme, ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Icon(
+              Icons.cloud_off_outlined,
+              size: 40,
+              color: Colors.grey[500],
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'データを取得できませんでした',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '時間をおいてもう一度お試しください',
+            textAlign: TextAlign.center,
+            style: TextStyle(
               fontSize: 14,
               color: Colors.grey[600],
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _loadData,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colorScheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                '再試行',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],
@@ -194,22 +277,63 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Widget _buildEmpty(ThemeData theme) {
-    return Center(
+  Widget _buildEmpty(ThemeData theme, ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.history,
-            size: 48,
-            color: Colors.grey[400],
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Icon(
+              Icons.directions_walk_outlined,
+              size: 40,
+              color: Colors.grey[500],
+            ),
           ),
-          const SizedBox(height: 16),
-          Text(
-            '履歴データがありません',
+          const SizedBox(height: 24),
+          const Text(
+            'まだ履歴がありません',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '歩数データが記録されると\nここに表示されます',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
               color: Colors.grey[600],
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: _loadData,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: colorScheme.primary,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                side: BorderSide(color: colorScheme.primary),
+              ),
+              child: const Text(
+                '更新',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],

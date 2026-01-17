@@ -115,7 +115,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ? _buildLoading(theme)
             : _healthStatus == HealthStatus.notAuthorized
                 ? _buildPermissionRequest(theme, colorScheme)
-                : _buildContent(theme, colorScheme),
+                : _healthStatus == HealthStatus.error
+                    ? _buildError(theme, colorScheme)
+                    : _buildContent(theme, colorScheme),
       ),
     );
   }
@@ -125,13 +127,86 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 16),
+          SizedBox(
+            width: 48,
+            height: 48,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              color: Colors.grey[400],
+            ),
+          ),
+          const SizedBox(height: 20),
           Text(
             '歩数を取得中...',
             style: TextStyle(
+              fontSize: 15,
+              color: Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildError(ThemeData theme, ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Icon(
+              Icons.cloud_off_outlined,
+              size: 40,
+              color: Colors.grey[500],
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'データを取得できませんでした',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '時間をおいてもう一度お試しください',
+            textAlign: TextAlign.center,
+            style: TextStyle(
               fontSize: 14,
               color: Colors.grey[600],
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _checkAndFetchSteps,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colorScheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                '再試行',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],
