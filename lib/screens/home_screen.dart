@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:app_settings/app_settings.dart';
 import '../services/goal_service.dart';
 import '../services/health_service.dart';
 
@@ -167,7 +168,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            '歩数データを取得するために\nヘルスケアへのアクセスを許可してください',
+            '歩数を表示するために\nヘルスケアへのアクセスを許可してください',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
@@ -191,6 +192,28 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: const Text(
                 '許可する',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () => AppSettings.openAppSettings(),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: colorScheme.primary,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                side: BorderSide(color: colorScheme.primary),
+              ),
+              child: const Text(
+                '設定を開く',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,

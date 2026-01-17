@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:app_settings/app_settings.dart';
 import '../services/health_service.dart';
 import '../services/goal_service.dart';
 
@@ -12,7 +13,7 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   List<DailySteps> _weeklySteps = [];
   int _goalSteps = GoalService.defaultGoal;
-  bool _isLoading = true;
+  HealthStatus _healthStatus = HealthStatus.loading;
 
   @override
   void initState() {
@@ -22,8 +23,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Future<void> _loadData() async {
     setState(() {
-      _isLoading = true;
+      _healthStatus = HealthStatus.loading;
     });
+
+    // 権限チェック
+    final hasAuth = await HealthService.hasAuthorization();
+    if (!hasAuth) {
+      final granted = await HealthService.requestAuthorization();
+      if (!granted) {
+        if (mounted) {
+          setState(() {
+            _healthStatus = HealthStatus.notAuthorized;
+          });
+        }
+        return;
+      }
+    }
 
     final goal = await GoalService.getGoalSteps();
     final steps = await HealthService.getWeeklySteps();
@@ -32,8 +47,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
       setState(() {
         _goalSteps = goal;
         _weeklySteps = steps;
-        _isLoading = false;
+        _healthStatus = HealthStatus.authorized;
       });
+    }
+  }
+
+  Future<void> _requestPermission() async {
+    setState(() {
+      _healthStatus = HealthStatus.loading;
+    });
+
+    final granted = await HealthService.requestAuthorization();
+    if (granted) {
+      await _loadData();
+    } else {
+      if (mounted) {
+        setState(() {
+          _healthStatus = HealthStatus.notAuthorized;
+        });
+      }
     }
   }
 
@@ -45,11 +77,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
-        child: _isLoading
+        child: _healthStatus == HealthStatus.loading
             ? _buildLoading()
-            : _weeklySteps.isEmpty
-                ? _buildEmpty(theme)
-                : _buildContent(theme, colorScheme),
+            : _healthStatus == HealthStatus.notAuthorized
+                ? _buildPermissionRequest(theme, colorScheme)
+                : _weeklySteps.isEmpty
+                    ? _buildEmpty(theme)
+                    : _buildContent(theme, colorScheme),
       ),
     );
   }
@@ -66,6 +100,93 @@ class _HistoryScreenState extends State<HistoryScreen> {
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPermissionRequest(ThemeData theme, ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: colorScheme.secondary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Icon(
+              Icons.favorite_border,
+              size: 40,
+              color: colorScheme.secondary,
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'ヘルスケアの許可が必要です',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '歩数を表示するために\nヘルスケアへのアクセスを許可してください',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[600],
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 32),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _requestPermission,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colorScheme.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                '許可する',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () => AppSettings.openAppSettings(),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: colorScheme.primary,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                side: BorderSide(color: colorScheme.primary),
+              ),
+              child: const Text(
+                '設定を開く',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],

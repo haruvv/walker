@@ -10,42 +10,73 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _goalController = TextEditingController();
-  bool _isSaved = false;
+  final FocusNode _focusNode = FocusNode();
+  bool _showSaved = false;
+  String _lastSavedValue = '';
 
   @override
   void initState() {
     super.initState();
     _loadGoalSteps();
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    // フォーカスが外れたら自動保存
+    if (!_focusNode.hasFocus) {
+      _autoSave();
+    }
   }
 
   Future<void> _loadGoalSteps() async {
     final goal = await GoalService.getGoalSteps();
     setState(() {
       _goalController.text = goal.toString();
+      _lastSavedValue = goal.toString();
     });
   }
 
-  Future<void> _saveGoalSteps() async {
+  Future<void> _autoSave() async {
     final text = _goalController.text.trim();
+    if (text == _lastSavedValue) return; // 変更がなければスキップ
+    
     final steps = int.tryParse(text);
     if (steps != null && steps > 0) {
       await GoalService.setGoalSteps(steps);
-      setState(() {
-        _isSaved = true;
-      });
-      // 2秒後に「保存済み」表示を消す
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          setState(() {
-            _isSaved = false;
-          });
-        }
-      });
+      _lastSavedValue = text;
+      _showSavedIndicator();
     }
+  }
+
+  Future<void> _setGoalAndSave(int steps) async {
+    setState(() {
+      _goalController.text = steps.toString();
+    });
+    
+    if (_lastSavedValue == steps.toString()) return;
+    
+    await GoalService.setGoalSteps(steps);
+    _lastSavedValue = steps.toString();
+    _showSavedIndicator();
+  }
+
+  void _showSavedIndicator() {
+    setState(() {
+      _showSaved = true;
+    });
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) {
+        setState(() {
+          _showSaved = false;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
+    _focusNode.removeListener(_onFocusChange);
+    _focusNode.dispose();
     _goalController.dispose();
     super.dispose();
   }
@@ -57,267 +88,271 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'カスタマイズ',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: colorScheme.secondary,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Settings',
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                children: [
-                  // 目標歩数設定カード
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
-                          blurRadius: 20,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: colorScheme.secondary.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Icon(
-                                  Icons.flag_outlined,
-                                  color: colorScheme.secondary,
-                                  size: 24,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      '1日の目標歩数',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        letterSpacing: -0.3,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '毎日の歩数目標を設定',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.grey[500],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          height: 1,
-                          color: Colors.grey.shade100,
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: TextField(
-                            controller: _goalController,
-                            keyboardType: TextInputType.number,
-                            textAlign: TextAlign.center,
-                            onChanged: (_) {
-                              // 入力が変わったら保存済み表示をリセット
-                              if (_isSaved) {
-                                setState(() {
-                                  _isSaved = false;
-                                });
-                              }
-                            },
-                            style: const TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: -1,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: '8000',
-                              hintStyle: TextStyle(
-                                color: Colors.grey[300],
-                                fontSize: 32,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              suffixText: '歩',
-                              suffixStyle: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w500,
-                                color: Colors.grey[500],
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(20),
-                                borderSide: BorderSide.none,
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(20),
-                                borderSide: BorderSide.none,
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(20),
-                                borderSide: BorderSide(
-                                  color: colorScheme.secondary,
-                                  width: 2,
-                                ),
-                              ),
-                              filled: true,
-                              fillColor: Colors.grey.shade50,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: 20,
-                              ),
-                            ),
-                          ),
-                        ),
-                        // 保存ボタン
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: _saveGoalSteps,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: colorScheme.primary,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                elevation: 0,
-                              ),
-                              child: Text(
-                                _isSaved ? '保存しました' : '保存',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // 推奨目標カード
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(28),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
-                          blurRadius: 20,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(), // 画面タップでフォーカス解除
+        child: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Text(
+                          'カスタマイズ',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: colorScheme.secondary,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Settings',
+                          style: theme.textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                    // 保存インジケーター
+                    AnimatedOpacity(
+                      opacity: _showSaved ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colorScheme.secondary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.lightbulb_outline,
+                              Icons.check,
+                              size: 14,
                               color: colorScheme.secondary,
-                              size: 20,
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 4),
                             Text(
-                              '推奨目標',
+                              '保存しました',
                               style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.grey[700],
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: colorScheme.secondary,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-                        _GoalSuggestion(
-                          label: '健康維持',
-                          steps: 8000,
-                          isSelected: _goalController.text == '8000',
-                          color: colorScheme.secondary,
-                          onTap: () => _setGoal('8000'),
-                        ),
-                        const SizedBox(height: 8),
-                        _GoalSuggestion(
-                          label: 'アクティブ',
-                          steps: 10000,
-                          isSelected: _goalController.text == '10000',
-                          color: colorScheme.secondary,
-                          onTap: () => _setGoal('10000'),
-                        ),
-                        const SizedBox(height: 8),
-                        _GoalSuggestion(
-                          label: 'チャレンジ',
-                          steps: 15000,
-                          isSelected: _goalController.text == '15000',
-                          color: colorScheme.secondary,
-                          onTap: () => _setGoal('15000'),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 24),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  children: [
+                    // 目標歩数設定カード
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.03),
+                            blurRadius: 20,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.secondary.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Icon(
+                                    Icons.flag_outlined,
+                                    color: colorScheme.secondary,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        '1日の目標歩数',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: -0.3,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '入力後、自動で保存されます',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey[500],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            height: 1,
+                            color: Colors.grey.shade100,
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: TextField(
+                              controller: _goalController,
+                              focusNode: _focusNode,
+                              keyboardType: TextInputType.number,
+                              textAlign: TextAlign.center,
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) => _autoSave(),
+                              style: const TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: -1,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: '8000',
+                                hintStyle: TextStyle(
+                                  color: Colors.grey[300],
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                suffixText: '歩',
+                                suffixStyle: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey[500],
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  borderSide: BorderSide.none,
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  borderSide: BorderSide.none,
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                  borderSide: BorderSide(
+                                    color: colorScheme.secondary,
+                                    width: 2,
+                                  ),
+                                ),
+                                filled: true,
+                                fillColor: Colors.grey.shade50,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 20,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 推奨目標カード
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.03),
+                            blurRadius: 20,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.lightbulb_outline,
+                                color: colorScheme.secondary,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '推奨目標（タップで即保存）',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          _GoalSuggestion(
+                            label: '健康維持',
+                            steps: 8000,
+                            isSelected: _goalController.text == '8000',
+                            color: colorScheme.secondary,
+                            onTap: () => _setGoalAndSave(8000),
+                          ),
+                          const SizedBox(height: 8),
+                          _GoalSuggestion(
+                            label: 'アクティブ',
+                            steps: 10000,
+                            isSelected: _goalController.text == '10000',
+                            color: colorScheme.secondary,
+                            onTap: () => _setGoalAndSave(10000),
+                          ),
+                          const SizedBox(height: 8),
+                          _GoalSuggestion(
+                            label: 'チャレンジ',
+                            steps: 15000,
+                            isSelected: _goalController.text == '15000',
+                            color: colorScheme.secondary,
+                            onTap: () => _setGoalAndSave(15000),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
-  }
-
-  void _setGoal(String value) {
-    setState(() {
-      _goalController.text = value;
-      _isSaved = false;
-    });
   }
 }
 
